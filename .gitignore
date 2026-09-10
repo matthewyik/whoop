@@ -1,0 +1,7 @@
+# Never commit private WHOOP data or credentials
+whoop_data.json
+whoop_tokens.json
+whoop.py
+*.log
+.env
+.env.*
