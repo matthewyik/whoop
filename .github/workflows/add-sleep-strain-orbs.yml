@@ -1,0 +1,65 @@
+name: Add sleep and strain orbs
+
+on:
+  push:
+    paths:
+      - '.github/workflows/add-sleep-strain-orbs.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add sleep and strain orbs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('dashboard.html')
+          s=p.read_text(encoding='utf-8')
+
+          css_old='.orb-state{font-size:13px;margin-top:8px;font-weight:700}.stack{display:grid;gap:18px}'
+          css_new='.orb-state{font-size:13px;margin-top:8px;font-weight:700}.mini-orb-row{position:absolute;left:18px;right:18px;bottom:18px;display:flex;justify-content:space-between;align-items:flex-end;z-index:2;pointer-events:none}.mini-orb{--mini:74,179,255;width:92px;aspect-ratio:1;border-radius:50%;display:grid;place-items:center;text-align:center;background:radial-gradient(circle at 50% 42%,rgba(var(--mini),.26),rgba(var(--mini),.08) 55%,rgba(var(--mini),.02) 70%);border:2px solid rgba(var(--mini),.72);box-shadow:0 0 26px rgba(var(--mini),.18),inset 0 0 20px rgba(var(--mini),.08)}.mini-orb-value{font-size:25px;font-weight:850;line-height:.95;letter-spacing:-.04em}.mini-orb-label{font-size:8px;letter-spacing:.14em;color:rgba(255,255,255,.68);margin-top:5px;font-weight:800}.mini-orb-sub{font-size:8px;color:rgba(255,255,255,.48);margin-top:3px}.stack{display:grid;gap:18px}'
+          if css_old not in s:
+              raise SystemExit('CSS anchor not found')
+          s=s.replace(css_old,css_new,1)
+
+          html_old='<div class="orb-state" id="orbState">—</div></div></div></div></div></div><div class="stack">'
+          html_new='<div class="orb-state" id="orbState">—</div></div></div></div><div class="mini-orb-row"><div class="mini-orb" id="sleepOrb"><div><div class="mini-orb-value" id="sleepOrbValue">—</div><div class="mini-orb-label">SLEEP</div><div class="mini-orb-sub">score</div></div></div><div class="mini-orb" id="strainOrb" style="--mini:74,179,255"><div><div class="mini-orb-value" id="strainOrbValue">—</div><div class="mini-orb-label">STRAIN</div><div class="mini-orb-sub">0–21</div></div></div></div></div><div class="stack">'
+          if html_old not in s:
+              raise SystemExit('HTML anchor not found')
+          s=s.replace(html_old,html_new,1)
+
+          js_old='$("orbState").className="orb-state "+z.cls;$("hrv").textContent='
+          js_new='$("orbState").className="orb-state "+z.cls;const sleepZone=zone(sleepPerf);$("sleepOrbValue").textContent=Math.round(sleepPerf)+"%";$("sleepOrb").style.setProperty("--mini",sleepZone.rgb.join(","));const strain=+cyc?.score?.strain;$("strainOrbValue").textContent=Number.isFinite(strain)?strain.toFixed(1):"—";$("hrv").textContent='
+          if js_old not in s:
+              raise SystemExit('JS anchor not found')
+          s=s.replace(js_old,js_new,1)
+
+          mobile_old='@media(max-width:560px){.shell{'
+          mobile_new='@media(max-width:560px){.mini-orb-row{left:12px;right:12px;bottom:12px}.mini-orb{width:76px}.mini-orb-value{font-size:21px}.shell{'
+          if mobile_old not in s:
+              raise SystemExit('Mobile CSS anchor not found')
+          s=s.replace(mobile_old,mobile_new,1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate dashboard JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('dashboard.html').read_text(encoding='utf-8')
+          js=s.split('<script>',1)[1].rsplit('</script>',1)[0]
+          Path('/tmp/dashboard.js').write_text(js,encoding='utf-8')
+          PY
+          node --check /tmp/dashboard.js
+      - name: Commit dashboard update
+        run: |
+          rm .github/workflows/add-sleep-strain-orbs.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dashboard.html .github/workflows/add-sleep-strain-orbs.yml
+          git commit -m "Add sleep and strain orbs"
+          git push
