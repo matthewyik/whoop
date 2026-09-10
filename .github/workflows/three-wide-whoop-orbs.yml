@@ -1,0 +1,79 @@
+name: Three wide WHOOP orbs
+
+on:
+  push:
+    paths:
+      - '.github/workflows/three-wide-whoop-orbs.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build three equal particle orbs
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('dashboard.html')
+          s = p.read_text(encoding='utf-8')
+
+          css_pattern = re.compile(r'\.orb-card\{.*?\.stack\{display:grid;gap:18px\}', re.S)
+          css_new = '''.orb-card{min-height:300px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:center;gap:10px;position:relative;overflow:hidden;padding:18px}.orb-card:before{content:"";position:absolute;inset:-30%;background:radial-gradient(circle,rgba(46,229,138,.06),transparent 50%);pointer-events:none}.orb-unit{min-width:0;display:grid;place-items:center;position:relative;z-index:1}.orb-stage{position:relative;width:min(100%,170px);aspect-ratio:1}.orb-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}.orb-mid{position:absolute;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none}.orb-value{font-size:clamp(34px,4vw,50px);font-weight:850;line-height:.9;font-variant-numeric:tabular-nums;text-shadow:0 2px 28px rgba(0,0,0,.7);letter-spacing:-.05em}.orb-caption{font-size:9px;letter-spacing:.17em;color:rgba(255,255,255,.68);margin-top:9px;font-weight:800}.orb-state{font-size:10px;margin-top:6px;font-weight:700}.stack{display:grid;gap:18px}'''
+          s, n = css_pattern.subn(css_new, s, count=1)
+          if n != 1:
+              raise SystemExit(f'CSS replacement count {n}')
+
+          html_pattern = re.compile(r'<section class="hero"><div class="card orb-card">.*?<div class="stack">', re.S)
+          html_new = '''<section class="hero"><div class="card orb-card"><div class="orb-unit"><div class="orb-stage"><canvas id="orb"></canvas><div class="orb-mid"><div><div class="orb-value" id="orbValue">—</div><div class="orb-caption">RECOVERY</div><div class="orb-state" id="orbState">—</div></div></div></div></div><div class="orb-unit"><div class="orb-stage"><canvas id="sleepOrbCanvas"></canvas><div class="orb-mid"><div><div class="orb-value" id="sleepOrbValue">—</div><div class="orb-caption">SLEEP</div><div class="orb-state" id="sleepOrbState">PERFORMANCE</div></div></div></div></div><div class="orb-unit"><div class="orb-stage"><canvas id="strainOrbCanvas"></canvas><div class="orb-mid"><div><div class="orb-value" id="strainOrbValue">—</div><div class="orb-caption">STRAIN</div><div class="orb-state" id="strainOrbState">0–21</div></div></div></div></div></div><div class="stack">'''
+          s, n = html_pattern.subn(html_new, s, count=1)
+          if n != 1:
+              raise SystemExit(f'HTML replacement count {n}')
+
+          # Replace the old mini-orb render code with values for the three equal orbs.
+          render_old = '$("orbState").className="orb-state "+z.cls;const sleepZone=zone(sleepPerf);$("sleepOrbValue").textContent=Math.round(sleepPerf)+"%";$("sleepOrb").style.setProperty("--mini",sleepZone.rgb.join(","));const strain=+cyc?.score?.strain;$("strainOrbValue").textContent=Number.isFinite(strain)?strain.toFixed(1):"—";$("hrv").textContent='
+          render_new = '$("orbState").className="orb-state "+z.cls;const sleepZone=zone(sleepPerf);$("sleepOrbValue").textContent=Math.round(sleepPerf);$("sleepOrbState").textContent="PERFORMANCE";const strain=+cyc?.score?.strain;$("strainOrbValue").textContent=Number.isFinite(strain)?strain.toFixed(1):"—";$("strainOrbState").textContent="0–21";$("hrv").textContent='
+          if render_old not in s:
+              raise SystemExit('Render anchor not found')
+          s = s.replace(render_old, render_new, 1)
+
+          if 'updateOrbColor(z.rgb);}' not in s:
+              raise SystemExit('Orb update anchor not found')
+          s = s.replace('updateOrbColor(z.rgb);}', 'updateOrbColors(z.rgb,sleepZone.rgb,[74,179,255]);}', 1)
+
+          orb_pattern = re.compile(r'let ORB_RGB=\[46,229,138\].*?\}\$\("saveLog"\)', re.S)
+          orb_new = '''const ORB_ENGINES={};function makeOrbEngine(canvasId,initialRgb){const cv=$(canvasId);if(!cv)return null;const ctx=cv.getContext("2d"),points=[],N=900,reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;let rgb=[...initialRgb],W=0,H=0,t=Math.random()*10;for(let i=0;i<N;i++){const u=Math.random()*2-1,th=Math.random()*Math.PI*2,s=Math.sqrt(1-u*u);points.push({x:s*Math.cos(th),y:s*Math.sin(th),z:u,r:Math.random()*.55+.75,ph:Math.random()*Math.PI*2})}function size(){const b=cv.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);W=b.width;H=b.height;cv.width=Math.max(1,W*dpr);cv.height=Math.max(1,H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0)}addEventListener("resize",size);size();function frame(){if(!W)size();ctx.clearRect(0,0,W,H);const [cr,cg,cb]=rgb,cx=W/2,cy=H/2,R=Math.min(W,H)*.42,breathe=1+Math.sin(t*.9)*.026;const g=ctx.createRadialGradient(cx,cy,R*.15,cx,cy,R*1.25);g.addColorStop(0,`rgba(${cr},${cg},${cb},.20)`);g.addColorStop(1,`rgba(${cr},${cg},${cb},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,R*1.25,0,7);ctx.fill();const cos=Math.cos(t*.22),sin=Math.sin(t*.22),draw=[];for(const p of points){const x=p.x*cos-p.z*sin,z=p.x*sin+p.z*cos,rr=R*breathe*(1+Math.sin(t*1.5+p.ph)*.012),per=.62+.38*(z+1)/2;draw.push({X:cx+x*rr*per,Y:cy+p.y*rr*per,z,r:p.r*per})}draw.sort((a,b)=>a.z-b.z);for(const p of draw){const a=.10+.72*((p.z+1)/2)**2.1;ctx.beginPath();ctx.arc(p.X,p.Y,p.r,0,7);ctx.fillStyle=p.z>.55?`rgba(220,255,236,${a})`:`rgba(${cr},${cg},${cb},${a})`;ctx.fill()}if(!reduce){t+=.016;requestAnimationFrame(frame)}}frame();return{setColor(c){rgb=[...c]}}}function initOrbEngines(){if(!ORB_ENGINES.recovery)ORB_ENGINES.recovery=makeOrbEngine("orb",[46,229,138]);if(!ORB_ENGINES.sleep)ORB_ENGINES.sleep=makeOrbEngine("sleepOrbCanvas",[74,179,255]);if(!ORB_ENGINES.strain)ORB_ENGINES.strain=makeOrbEngine("strainOrbCanvas",[74,179,255])}function updateOrbColors(recoveryRgb,sleepRgb,strainRgb){initOrbEngines();ORB_ENGINES.recovery?.setColor(recoveryRgb);ORB_ENGINES.sleep?.setColor(sleepRgb);ORB_ENGINES.strain?.setColor(strainRgb)}$("saveLog")'''
+          s, n = orb_pattern.subn(orb_new, s, count=1)
+          if n != 1:
+              raise SystemExit(f'Orb engine replacement count {n}')
+
+          # Responsive three-wide layout: stay three across on tablet, compact three across on phone.
+          s = re.sub(r'@media\(max-width:850px\)\{\.hero,\.grid2,\.foot\{grid-template-columns:1fr\}\.orb-card\{.*?\}\.settings', '@media(max-width:850px){.hero,.grid2,.foot{grid-template-columns:1fr}.orb-card{min-height:260px;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:14px}.orb-stage{width:min(100%,150px)}.settings', s, count=1)
+          s = re.sub(r'@media\(max-width:560px\)\{\.orb-card\{.*?\.shell\{', '@media(max-width:560px){.orb-card{min-height:210px;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:9px 6px}.orb-stage{width:min(100%,105px)}.orb-value{font-size:clamp(25px,8vw,34px)}.orb-caption{font-size:7px;letter-spacing:.12em;margin-top:6px}.orb-state{font-size:8px;margin-top:4px}.shell{', s, count=1)
+
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Validate dashboard
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('dashboard.html').read_text(encoding='utf-8')
+          for needle in ['id="orb"','id="sleepOrbCanvas"','id="strainOrbCanvas"','function makeOrbEngine','updateOrbColors']:
+              if needle not in s:
+                  raise SystemExit('Missing '+needle)
+          js=s.split('<script>',1)[1].rsplit('</script>',1)[0]
+          Path('/tmp/dashboard.js').write_text(js,encoding='utf-8')
+          PY
+          node --check /tmp/dashboard.js
+      - name: Commit three-wide orb layout
+        run: |
+          rm .github/workflows/three-wide-whoop-orbs.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add dashboard.html .github/workflows/three-wide-whoop-orbs.yml
+          git commit -m "Use three-wide animated WHOOP orbs"
+          git push
