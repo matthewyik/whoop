@@ -26,7 +26,7 @@ jobs:
               raise SystemExit('CSS anchor not found')
           s=s.replace(css_old,css_new,1)
 
-          html_old='<div class="orb-state" id="orbState">—</div></div></div></div></div></div><div class="stack">'
+          html_old='<div class="orb-state" id="orbState">—</div></div></div></div></div><div class="stack">'
           html_new='<div class="orb-state" id="orbState">—</div></div></div></div><div class="mini-orb-row"><div class="mini-orb" id="sleepOrb"><div><div class="mini-orb-value" id="sleepOrbValue">—</div><div class="mini-orb-label">SLEEP</div><div class="mini-orb-sub">score</div></div></div><div class="mini-orb" id="strainOrb" style="--mini:74,179,255"><div><div class="mini-orb-value" id="strainOrbValue">—</div><div class="mini-orb-label">STRAIN</div><div class="mini-orb-sub">0–21</div></div></div></div></div><div class="stack">'
           if html_old not in s:
               raise SystemExit('HTML anchor not found')
